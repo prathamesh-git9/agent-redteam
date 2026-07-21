@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-redteam"
+version = "0.1.0"
+description = "Adversarial testing and runtime guardrails for LLM agents: an attack library, an evidence-backed scoring harness with regression suites, and composable defense middleware."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "prathamesh-git9" }]
+keywords = ["llm", "security", "red-team", "prompt-injection", "guardrails", "ai-safety"]
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.6",
+  "typer>=0.12",
+  "rich>=13.7",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+mcp = ["mcp>=1.2"]
+llm = ["openai>=1.40"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0", "ruff>=0.4"]
+
+[project.scripts]
+agent-redteam = "agent_redteam.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/prathamesh-git9/agent-redteam"
+Issues = "https://github.com/prathamesh-git9/agent-redteam/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_redteam"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# -p no:cacheprovider: the .pytest_cache dir is not always writable on all
+# volumes (e.g. some Windows drives) and the cache is not needed in CI.
+addopts = "-q -p no:cacheprovider"
+
+[tool.ruff]
+line-length = 90
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
