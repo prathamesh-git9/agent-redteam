@@ -1,0 +1,27 @@
+# Red-team an arbitrary JSON HTTP agent (your own service).
+#
+# The request_template maps a conversation into your service's request body.
+# Placeholder tokens are substituted:
+#   {{last_user}}    -> the latest user message (a plain string)
+#   {{messages}}     -> OpenAI-style [{role, content}, ...]
+#   {{full_prompt}}  -> all messages joined by newlines
+# response_path is a dotted path into the JSON reply (integers index arrays).
+target:
+  name: my-http-agent
+  kind: http
+  authorized: true
+  allowlist:
+    - agent.internal.acme.com
+  options:
+    url: https://agent.internal.acme.com/v1/chat
+    method: POST
+    headers:
+      Authorization: "Bearer ${AGENT_TOKEN}"   # substitute in your shell / CI
+    request_template:
+      session: "redteam"
+      input: "{{last_user}}"
+    response_path: "data.reply"
+
+run:
+  suite: default
+  fail_threshold: 7.0

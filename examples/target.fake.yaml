@@ -1,0 +1,14 @@
+# Offline demo target — no API key, no network. Great for a first run:
+#   agent-redteam scan --config examples/target.fake.yaml --suite smoke
+#
+# The 'fake' kind is a scripted, deterministic target used throughout the tests.
+# It is authorized/allowlisted by construction because it never leaves the
+# process.
+target:
+  name: demo-fake
+  kind: fake
+  authorized: true
+
+run:
+  suite: smoke
+  fail_threshold: 7.0

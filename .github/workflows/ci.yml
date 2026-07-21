@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e ".[dev,llm]"
+      - name: Ruff
+        run: ruff check .
+      - name: Tests
+        # The full suite is offline by design (FakeTarget/FakeJudge), so no
+        # API keys are needed in CI.
+        run: pytest -q --cov=agent_redteam --cov-report=term-missing
