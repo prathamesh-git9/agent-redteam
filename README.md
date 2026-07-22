@@ -131,6 +131,26 @@ agent-redteam list-attacks           # full catalog with ids and references
 agent-redteam scan --suite exfiltration --config target.yaml
 ```
 
+## Adaptive attacks
+
+A static payload asks *"does this fixed prompt work?"* An **adaptive** attack
+asks *"what works after watching how this target fails?"* — an attacker model
+reads the target's real response and refines the next payload toward the oracle's
+success criterion, in a bounded loop (PAIR / Crescendo strategies). This finds
+target-specific bypasses a fixed corpus misses.
+
+```bash
+agent-redteam scan --config target.yaml --suite tag:adaptive \
+  --adaptive --attacker-model gpt-4o-mini
+```
+
+Every adaptive finding records a full step-by-step `trace` in the JSON report
+(each payload the loop tried and how the target answered), so it is as auditable
+as a static finding. It is **budget-safe and gated**: the same authorization
+check applies, and a shared budget ledger caps target calls, attacker calls,
+tokens, and wall-clock — an adaptive run can never runaway-spend. The CLI prints
+the attacker model id and the hard caps before it starts.
+
 ## Guardrails
 
 Composable middleware that wraps any target into a *defended* one:
