@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from agent_redteam.config import AuthorizationError, RunConfig, load_run_config
-from agent_redteam.oracles import default_oracle
+from agent_redteam.oracles import OpenAIJudge, default_oracle
 from agent_redteam.registry import all_attacks, all_guardrails, select_suite
 from agent_redteam.report import Report
 from agent_redteam.runner import Runner
@@ -106,6 +106,21 @@ def scan(
         "--compare",
         help="With --guardrails, print undefended vs defended side by side.",
     ),
+    judge_model: str | None = typer.Option(
+        None,
+        "--judge-model",
+        help="OpenAI-compatible model id for semantic judge scoring.",
+    ),
+    judge_base_url: str = typer.Option(
+        "https://api.openai.com/v1",
+        "--judge-base-url",
+        help="Base URL for the judge chat-completions endpoint.",
+    ),
+    judge_key_env: str = typer.Option(
+        "OPENAI_API_KEY",
+        "--judge-key-env",
+        help="Environment variable containing the judge API key.",
+    ),
 ) -> None:
     """Run an attack suite against the configured target."""
     cfg: RunConfig = load_run_config(config)
@@ -113,10 +128,19 @@ def scan(
         cfg.suite = suite
     if fail_threshold is not None:
         cfg.fail_threshold = fail_threshold
+    if judge_model is not None:
+        cfg.judge_model = judge_model
 
     _register_attacks()
     target = build_target(cfg.target)
-    oracle = default_oracle()  # canary+signature+tool+refusal; judge is opt-in
+    judge = None
+    if judge_model is not None:
+        judge = OpenAIJudge(
+            model=judge_model,
+            base_url=judge_base_url,
+            api_key_env=judge_key_env,
+        )
+    oracle = default_oracle(judge=judge)
     runner = Runner(oracle, cfg)
 
     console.print(
