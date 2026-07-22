@@ -8,6 +8,16 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Live causal-attribution POC (the differentiator)** — a support-ops agent
+  driven by a real model is compromised by an indirect injection hidden in a CRM
+  ticket (an "imported processor note" it's told to process), and the harness
+  emits the artifact no scanner produces from a transcript: the poisoned
+  artifact → unauthorized side-effect provenance path, a clean-twin counterfactual
+  proving causation, and a guard that blocks the side effect *before it executes*.
+  Verified live against gpt-4o-mini: 3/3 unauthorized credits on the naive agent,
+  0/3 on the clean twin, 0 executed with the authorization guard. A new
+  `NO_UNAUTHORIZED_ACCOUNT_CREDIT` invariant backs it. See
+  `examples/live_support_ticket_poc.py`.
 - **Agent/RAG episode harness** - opt-in `EpisodeTarget` scenarios exercise
   poisoned retrieved documents and tool execution as a resettable multi-step
   system, not a chat transcript. Findings contain typed provenance events,
