@@ -14,6 +14,11 @@ from agent_redteam.guardrails.base import (
     OutputGuardrail,
     ToolGuardrail,
 )
+from agent_redteam.guardrails.configuration import (
+    GuardrailConfigError,
+    load_guardrail_config,
+    pipeline_from_mapping,
+)
 from agent_redteam.guardrails.input_guards import (
     AllowlistGuard,
     EncodingNormalizer,
@@ -34,6 +39,7 @@ __all__ = [
     "EncodingNormalizer",
     "ExfilURLBlocker",
     "GuardPipeline",
+    "GuardrailConfigError",
     "InjectionDetector",
     "InputGuardrail",
     "OutputGuardrail",
@@ -42,6 +48,8 @@ __all__ = [
     "ToolCallPolicy",
     "ToolGuardrail",
     "default_guardrails",
+    "load_guardrail_config",
+    "pipeline_from_mapping",
 ]
 
 

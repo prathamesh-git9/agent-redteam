@@ -110,6 +110,7 @@ class TargetKind(StrEnum):
     HTTP = "http"
     CALLABLE = "callable"
     FAKE = "fake"
+    AGENT = "agent"
 
 
 @dataclass(frozen=True)
@@ -256,6 +257,14 @@ class AttackResult:
     score: RiskScore
     trace: tuple[Any, ...] = ()
     stop_reason: str | None = None
+    # Agentic runs retain a typed, causally linked episode trace separately from
+    # adaptive prompt-refinement observations.  These fields are additive so
+    # existing Target/Attack/Oracle integrations and saved reports remain valid.
+    scenario_id: str | None = None
+    episode_trace: Any = None
+    counterfactual_trace: Any = None
+    attribution: Any = None
+    recommendations: tuple[Any, ...] = ()
 
     @property
     def succeeded(self) -> bool:

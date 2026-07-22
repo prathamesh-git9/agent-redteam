@@ -38,7 +38,9 @@ def _register_attacks() -> None:
     import agent_redteam.attacks  # noqa: F401
 
 
-def _verdict_style(result_success: bool) -> str:
+def _verdict_style(result_success: bool, operational_error: bool = False) -> str:
+    if operational_error:
+        return "[yellow]ERROR[/yellow]"
     return "[red]SUCCESS[/red]" if result_success else "[green]blocked[/green]"
 
 
@@ -57,15 +59,20 @@ def _render_report(report: Report, title: str) -> None:
     table.add_column("Verdict")
     table.add_column("Evidence", overflow="fold")
     for r in sorted(report.results, key=lambda r: r.score.value, reverse=True):
-        ev = "; ".join(e.detail for e in r.verdict.evidence[:2]) or "—"
+        ev = (
+            "; ".join(e.detail for e in r.verdict.evidence[:2])
+            or r.response.error
+            or "—"
+        )
         table.add_row(
             str(r.score.value), band(r.score.value), r.probe.category.value,
-            r.probe.attack_id, _verdict_style(r.succeeded), ev,
+            r.probe.attack_id, _verdict_style(r.succeeded, r in report.errors), ev,
         )
     console.print(table)
     console.print(
         f"attacks: {len(report.results)}  "
         f"succeeded: [red]{len(report.successes)}[/red]  "
+        f"errors: [yellow]{len(report.errors)}[/yellow]  "
         f"max score: {report.max_score}"
     )
     for note in report.notes:
@@ -102,6 +109,11 @@ def scan(
         None,
         help="Apply a guardrail preset (e.g. 'default') and score the defended target.",
     ),
+    guardrail_config: Path | None = typer.Option(
+        None,
+        "--guardrail-config",
+        help="Apply a YAML/JSON GuardPipeline config (including report recommendations).",
+    ),
     compare: bool = typer.Option(
         False,
         "--compare",
@@ -126,6 +138,14 @@ def scan(
         False,
         "--adaptive",
         help="Run adaptive-capable attacks with a bounded attacker model loop.",
+    ),
+    agentic: bool = typer.Option(
+        False,
+        "--agentic",
+        help=(
+            "Run resettable RAG/tool-agent scenarios (authorized targets only; "
+            "side effects default to dry-run)."
+        ),
     ),
     attacker_model: str | None = typer.Option(
         None,
@@ -162,6 +182,19 @@ def scan(
             base_url=attacker_base_url,
             api_key_env=attacker_key_env,
         )
+    if agentic:
+        cfg.agentic = True
+    if guardrails and guardrail_config:
+        console.print(
+            "[red]error:[/red] use either --guardrails or --guardrail-config, not both"
+        )
+        raise typer.Exit(code=2)
+    if guardrails and guardrails != "default":
+        console.print(
+            "[red]error:[/red] unknown guardrail preset "
+            f"{guardrails!r}; expected 'default'"
+        )
+        raise typer.Exit(code=2)
 
     _register_attacks()
     target = build_target(cfg.target)
@@ -189,6 +222,11 @@ def scan(
             f"attacker_calls={limits.max_attacker_calls}, "
             f"tokens={limits.max_total_tokens}, seconds={limits.max_seconds}"
         )
+    if cfg.agentic:
+        console.print(
+            "[yellow]responsible use:[/yellow] agentic testing remains behind the "
+            "authorization gate and uses sandbox/dry-run side effects by default"
+        )
 
     try:
         base_report = asyncio.run(runner.run(target))
@@ -196,15 +234,36 @@ def scan(
         console.print(f"[red]refused:[/red] {exc}")
         raise typer.Exit(code=2) from exc
 
-    if guardrails:
+    pipeline = None
+    defense_label = None
+    if guardrail_config is not None:
+        from agent_redteam.guardrails import (
+            GuardrailConfigError,
+            load_guardrail_config,
+        )
+
+        try:
+            pipeline = load_guardrail_config(guardrail_config)
+        except (GuardrailConfigError, OSError) as exc:
+            console.print(f"[red]error:[/red] invalid guardrail config: {exc}")
+            raise typer.Exit(code=2) from exc
+        defense_label = str(guardrail_config)
+    elif guardrails:
         from agent_redteam.guardrails import default_guardrails
 
-        defended = default_guardrails().wrap(target)
+        pipeline = default_guardrails()
+        defense_label = guardrails
+
+    if pipeline is not None:
+        defended = pipeline.wrap(target)
         defended_report = asyncio.run(runner.run(defended))
         if compare:
             _render_compare(base_report, defended_report)
         else:
-            _render_report(defended_report, f"agent-redteam (guardrails={guardrails})")
+            _render_report(
+                defended_report,
+                f"agent-redteam (guardrails={defense_label})",
+            )
         _write_reports(defended_report, report, json_out, junit)
         raise typer.Exit(code=1 if defended_report.failed else 0)
 
@@ -235,8 +294,16 @@ def list_attacks(as_json: bool = typer.Option(False, "--json")) -> None:
         import json
 
         console.print_json(
-            json.dumps([{"id": s.id, "category": s.category.value, "tags": sorted(s.tags),
-                         "summary": s.summary} for s in specs])
+            json.dumps([
+                {
+                    "id": s.id,
+                    "category": s.category.value,
+                    "tags": sorted(s.tags),
+                    "requirements": sorted(s.requirements),
+                    "summary": s.summary,
+                }
+                for s in specs
+            ])
         )
         return
     table = Table(title=f"{len(specs)} attacks")
@@ -343,7 +410,10 @@ def show_report(
     for r in results:
         ev = "; ".join(e.get("detail", "") for e in r.get("evidence", [])[:2]) or "—"
         succeeded = r.get("success")
-        verdict_cell = "[red]SUCCESS[/red]" if succeeded else "[green]blocked[/green]"
+        operational_error = bool(r.get("error")) or any(
+            item.get("kind") == "judge_error" for item in r.get("evidence", [])
+        )
+        verdict_cell = _verdict_style(bool(succeeded), operational_error)
         table.add_row(
             str(r.get("score", 0)), r.get("band", "?"), r.get("category", "?"),
             r.get("attack_id", "?"), verdict_cell, ev,
@@ -353,6 +423,7 @@ def show_report(
     console.print(
         f"attacks: {summary.get('total', 0)}  "
         f"succeeded: [red]{summary.get('successes', 0)}[/red]  "
+        f"errors: [yellow]{summary.get('errors', 0)}[/yellow]  "
         f"max score: {summary.get('max_score', 0)}"
     )
 

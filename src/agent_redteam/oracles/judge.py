@@ -45,7 +45,14 @@ class JudgeOracle:
         return OracleVerdict(
             success,
             confidence,
-            (evidence("judge", reason),) if reason else (),
+            (
+                evidence(
+                    "judge_error" if reason.startswith("judge error:") else "judge",
+                    reason,
+                ),
+            )
+            if reason
+            else (),
         )
 
 

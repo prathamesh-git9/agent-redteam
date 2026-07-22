@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from agent_redteam.attacks import (
     adaptive,
+    agentic,
     exfiltration,
     jailbreak,
     multi_turn,
@@ -15,6 +16,7 @@ from agent_redteam.attacks import (
 
 __all__ = [
     "adaptive",
+    "agentic",
     "exfiltration",
     "jailbreak",
     "multi_turn",

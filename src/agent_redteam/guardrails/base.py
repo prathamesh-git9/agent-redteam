@@ -53,21 +53,34 @@ _BLOCKED_REPLY = "I can't help with that request."
 @dataclass
 class GuardPipeline:
     input_guards: list[InputGuardrail]
+    retrieval_guards: list[InputGuardrail]
     output_guards: list[OutputGuardrail]
     tool_guards: list[ToolGuardrail]
 
     def __init__(
         self,
         input_guards: list[InputGuardrail] | None = None,
+        retrieval_guards: list[InputGuardrail] | None = None,
         output_guards: list[OutputGuardrail] | None = None,
         tool_guards: list[ToolGuardrail] | None = None,
     ) -> None:
         self.input_guards = input_guards or []
+        self.retrieval_guards = (
+            list(self.input_guards)
+            if retrieval_guards is None
+            else retrieval_guards
+        )
         self.output_guards = output_guards or []
         self.tool_guards = tool_guards or []
 
     def wrap(self, target: Target) -> DefendedTarget:
         return DefendedTarget(target=target, pipeline=self)
+
+    def runtime_hooks(self, downstream=None):  # noqa: ANN001, ANN201
+        """Adapt this pipeline to agent execution-time trust boundaries."""
+        from agent_redteam.agentic.hooks import PipelineRuntimeHooks
+
+        return PipelineRuntimeHooks(self, downstream)
 
     # --- inspection primitives, reused by DefendedTarget and by unit tests -----
 
@@ -81,22 +94,17 @@ class GuardPipeline:
         under test; rewriting earlier system/assistant turns would change the
         target's own configuration rather than defend against the probe.
         """
-        decisions: list[GuardDecision] = []
-        messages = list(conversation)
-        idx = _last_user_index(messages)
-        if idx is None:
-            return conversation, decisions
-        content = messages[idx].content
-        for guard in self.input_guards:
-            decision = guard.inspect_input(Message(Role.USER, content))
-            decisions.append(decision)
-            if decision.action == GuardAction.BLOCK:
-                return conversation, decisions
-            if decision.action == GuardAction.REWRITE and decision.content is not None:
-                content = decision.content
-        messages[idx] = Message(Role.USER, content)
-        return tuple(messages), decisions
+        return _apply_input_guards(conversation, self.input_guards)
 
+    def apply_retrieval(
+        self,
+        content: str,
+    ) -> tuple[str, list[GuardDecision]]:
+        """Inspect one retrieved artifact at its own trust boundary."""
+        guarded, decisions = _apply_input_guards(
+            (Message(Role.USER, content),), self.retrieval_guards
+        )
+        return guarded[0].content, decisions
     def apply_output(self, text: str) -> tuple[str, list[GuardDecision], bool]:
         decisions: list[GuardDecision] = []
         blocked = False
@@ -128,6 +136,27 @@ class GuardPipeline:
             if not blocked:
                 kept.append(call)
         return tuple(kept), decisions
+
+
+def _apply_input_guards(
+    conversation: Conversation,
+    guards: list[InputGuardrail],
+) -> tuple[Conversation, list[GuardDecision]]:
+    decisions: list[GuardDecision] = []
+    messages = list(conversation)
+    idx = _last_user_index(messages)
+    if idx is None:
+        return conversation, decisions
+    content = messages[idx].content
+    for guard in guards:
+        decision = guard.inspect_input(Message(Role.USER, content))
+        decisions.append(decision)
+        if decision.action == GuardAction.BLOCK:
+            return conversation, decisions
+        if decision.action == GuardAction.REWRITE and decision.content is not None:
+            content = decision.content
+    messages[idx] = Message(Role.USER, content)
+    return tuple(messages), decisions
 
 
 @dataclass
@@ -182,6 +211,16 @@ class DefendedTarget(Target):
             usage=response.usage,
             latency_ms=response.latency_ms,
             raw={"guard_fired": fired, "target_raw": response.raw},
+        )
+
+    async def begin_episode(self, plan, controls, hooks):  # noqa: ANN001, ANN201
+        """Delegate an episode with guards installed before actual tool use."""
+        from agent_redteam.agentic.protocols import EpisodeTarget
+
+        if not isinstance(self.target, EpisodeTarget):
+            raise TypeError("wrapped target does not support agent episodes")
+        return await self.target.begin_episode(
+            plan, controls, self.pipeline.runtime_hooks(hooks)
         )
 
 

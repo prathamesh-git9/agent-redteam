@@ -274,6 +274,8 @@ async def test_report_serializes_adaptive_and_static_results() -> None:
     assert data["results"][0]["stop_reason"] == "success"
     assert data["results"][0]["trace"]
     assert encoded["results"][0]["trace"][0]["prompt"]
+    assert encoded["results"][0]["response"]["usage"]["total_tokens"] >= 0
+    assert "latency_ms" in encoded["results"][0]["response"]
     assert "adaptive: success after" in report.to_markdown()
 
     static_report = Report(target="t", suite="s", fail_threshold=7.0)

@@ -42,6 +42,26 @@ def test_scan_authorized_fake_target(client: TestClient):
     assert client.get(f"/report/{body['id']}").status_code == 200
 
 
+def test_scan_agentic_target_returns_causal_trace(client: TestClient):
+    resp = client.post(
+        "/scan",
+        json={
+            "target": {
+                "name": "agent-api-poc",
+                "kind": "fake_agent",
+                "authorized": True,
+            },
+            "run": {"suite": "tag:agentic", "agentic": True, "seed": 3},
+        },
+    )
+
+    assert resp.status_code == 200
+    finding = resp.json()["results"][0]
+    assert finding["agentic"] is True
+    assert finding["attribution"]["status"] == "causal"
+    assert finding["episode_trace"]["events"]
+
+
 def test_scan_unauthorized_is_forbidden(client: TestClient):
     # An unauthorized remote target must be refused at the auth gate, surfaced
     # as 403 rather than executed.

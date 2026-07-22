@@ -52,6 +52,13 @@ class RunConfig:
     # When true (and an attacker is wired), attacks that support it run as
     # bounded adaptive refinement loops instead of one-shot static probes.
     adaptive: bool = False
+    # Agent episodes are opt-in because they may exercise retrieval and tool
+    # capabilities. The Runner still enforces the same authorization gate.
+    agentic: bool = False
+    seed: int | None = None
+    # Production adapters must default to sandbox/dry-run side effects. Enabling
+    # live effects is deliberately not exposed by the CLI in this release.
+    allow_live_side_effects: bool = False
 
 
 def _host_of(target: str) -> str:
@@ -143,4 +150,7 @@ def parse_run_config(data: dict[str, Any]) -> RunConfig:
         judge_model=run.get("judge_model"),
         baseline_path=run.get("baseline_path"),
         adaptive=bool(run.get("adaptive", False)),
+        agentic=bool(run.get("agentic", False)),
+        seed=int(run["seed"]) if run.get("seed") is not None else None,
+        allow_live_side_effects=bool(run.get("allow_live_side_effects", False)),
     )

@@ -1,0 +1,10 @@
+guardrails:
+  retrieval_input:
+    - encoding_normalizer
+    - injection_detector
+  tool_policy:
+    allow:
+      - search
+      - read_document
+    deny:
+      - send_email

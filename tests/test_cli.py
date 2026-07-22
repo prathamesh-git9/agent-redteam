@@ -100,6 +100,40 @@ def test_scan_guardrails_compare_prints_comparison_table(tmp_path: Path) -> None
     assert "defended" in result.stdout
 
 
+def test_agentic_cli_reproduces_then_blocks_poisoned_rag(tmp_path: Path) -> None:
+    config = _write_config(tmp_path, name="agent-poc", kind="fake_agent")
+    base = runner.invoke(
+        app,
+        [
+            "scan",
+            "--config",
+            str(config),
+            "--suite",
+            "tag:agentic",
+            "--agentic",
+        ],
+    )
+    defended = runner.invoke(
+        app,
+        [
+            "scan",
+            "--config",
+            str(config),
+            "--suite",
+            "tag:agentic",
+            "--agentic",
+            "--guardrails",
+            "default",
+        ],
+    )
+
+    assert base.exit_code == 1
+    assert "SUCCESS" in base.stdout
+    assert defended.exit_code == 0
+    assert "PASS" in defended.stdout
+    assert "blocked" in defended.stdout
+
+
 def test_scan_refuses_unauthorized_remote_target_before_network(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,

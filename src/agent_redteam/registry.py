@@ -24,6 +24,7 @@ class AttackSpec:
     factory: Callable[[], object]  # returns an Attack instance
     tags: frozenset[str] = field(default_factory=frozenset)
     summary: str = ""
+    requirements: frozenset[str] = field(default_factory=frozenset)
 
 
 _ATTACKS: dict[str, AttackSpec] = {}
@@ -36,6 +37,7 @@ def register_attack(
     *,
     tags: Iterable[str] = (),
     summary: str = "",
+    requirements: Iterable[str] = (),
 ) -> Callable[[Callable[[], object]], Callable[[], object]]:
     """Decorator: register an attack factory under a stable id.
 
@@ -53,6 +55,7 @@ def register_attack(
             factory=factory,
             tags=frozenset(tags),
             summary=summary or (factory.__doc__ or "").strip().split("\n")[0],
+            requirements=frozenset(requirements),
         )
         return factory
 
@@ -102,7 +105,12 @@ def select_suite(name: str) -> list[AttackSpec]:
     if name == "all":
         return attacks
     if name == "default":
-        return [a for a in attacks if a.category != AttackCategory.RESOURCE_EXHAUSTION]
+        return [
+            a
+            for a in attacks
+            if a.category != AttackCategory.RESOURCE_EXHAUSTION
+            and "episode" not in a.requirements
+        ]
     if name == "smoke":
         seen: dict[AttackCategory, AttackSpec] = {}
         for a in attacks:

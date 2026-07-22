@@ -133,6 +133,28 @@ tokens / max wall-clock) so a resource-exhaustion *test* can never itself become
 a denial-of-wallet event. Every probe/response/verdict is recorded as an
 append-only `Trace` for evidence — nothing is judged off data we didn't store.
 
+### 4.1 `EpisodeTarget` - real agent and RAG execution
+
+`EpisodeTarget` is an additive capability; the original `Target.send` contract
+is unchanged. An episode target creates a fresh `EpisodeSession` for a
+`ScenarioPlan`, accepts explicit dry-run controls and runtime hooks, executes one
+scenario, and is closed in `finally` on every outcome. A scenario owns its
+poisoned artifacts, clean replacements, security invariants, and step/tool/time
+limits.
+
+The trace is a directed provenance graph of retrieval queries/results, model
+outputs, tool requests, guard decisions, tool results, side effects, and memory
+writes. Invariant evaluation is deterministic. When a failure occurs, the
+engine changes only the poisoned artifact and replays a clean twin: if the
+violation disappears, attribution is `causal`; if it persists or budget prevents
+replay, it is only `suspected`.
+
+`CallableEpisodeTarget` is the production in-process seam.
+`EpisodeInstrumentation.execute_tool` applies runtime hooks before calling the
+supplied executor, so a report can prove that a block prevented the side effect
+rather than merely hiding its textual result. `FakeAgentTarget` implements the
+same contract offline for CI and the shipped POC.
+
 ## 5. Guardrails (the defensive half)
 
 Guardrails are middleware, independent of attacks, composed into a `GuardPipeline`
@@ -147,6 +169,12 @@ tells an operator whether a mitigation helped.
   (strips/greenlights markdown-image and link side channels).
 - **Tool**: `ToolCallPolicy` (allow/deny tool + argument schema + SSRF host
   checks).
+
+For episode targets, the pipeline also adapts into `AgentRuntimeHooks`.
+Retrieved artifacts pass the input guards at the retrieval boundary, and tool
+policy executes between `TOOL_REQUEST` and `SIDE_EFFECT`. Post-response tool
+filtering remains available for legacy chat targets but is not treated as
+execution prevention.
 
 Each guardrail returns `GuardDecision(action=ALLOW|BLOCK|REWRITE, reason, evidence)`
 and is individually unit-tested for both true catches and false-positive safety.
@@ -174,6 +202,9 @@ src/agent_redteam/
   oracles/            # Signature/Canary/Refusal/Judge/Composite
   scoring/            # risk model + regression baseline
   guardrails/         # input/output/tool guardrails + pipeline
+  agentic/            # scenarios, EpisodeTarget, traces, invariants, clean twins
+  remediation.py      # evidence-to-config recommendations
+  findings.py         # deterministic root-cause clustering/deduplication
   runner.py           # orchestrator
   report.py           # JSON / Markdown / JUnit emitters
   cli.py              # typer app

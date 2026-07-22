@@ -151,3 +151,14 @@ async def test_default_oracle_with_fake_judge_reports_judge_only_success() -> No
     assert verdict.success is True
     assert verdict.confidence == 0.7
     assert verdict.evidence[-1].kind == "judge"
+
+
+async def test_judge_error_is_distinct_from_a_safe_verdict() -> None:
+    oracle = default_oracle(
+        judge=FakeJudge({}, default=(False, 0.0, "judge error: unavailable"))
+    )
+
+    verdict = await oracle.evaluate(_probe(), Response(text="unknown"))
+
+    assert not verdict.success
+    assert verdict.evidence[-1].kind == "judge_error"

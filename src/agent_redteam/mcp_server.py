@@ -38,13 +38,18 @@ def create_mcp_server() -> Any:
     def list_attacks() -> list[dict[str, Any]]:
         """List every registered attack with id, category and references."""
         return [
-            {"id": s.id, "category": s.category.value, "summary": s.summary}
+            {
+                "id": s.id,
+                "category": s.category.value,
+                "requirements": sorted(s.requirements),
+                "summary": s.summary,
+            }
             for s in all_attacks()
         ]
 
     @server.tool()
     def run_attack_suite(
-        target: dict[str, Any], suite: str = "default"
+        target: dict[str, Any], suite: str = "default", agentic: bool = False
     ) -> dict[str, Any]:
         """Run an attack suite against a target you are authorized to test.
 
@@ -52,7 +57,9 @@ def create_mcp_server() -> Any:
         authorized, allowlist, options). The authorization gate still applies:
         an unauthorized or off-allowlist target is refused, not scanned.
         """
-        cfg = parse_run_config({"target": target, "run": {"suite": suite}})
+        cfg = parse_run_config(
+            {"target": target, "run": {"suite": suite, "agentic": agentic}}
+        )
         built = build_target(cfg.target)
         try:
             report = asyncio.run(Runner(default_oracle(), cfg).run(built))

@@ -22,6 +22,14 @@ def build_target(cfg: TargetConfig) -> Target:
     if cfg.kind == "fake":
         # A fake target is only useful for self-tests/demos; it ignores options.
         return FakeTarget(name=cfg.name)
+    if cfg.kind == "fake_agent":
+        from agent_redteam.agentic.fake import FakeAgentTarget
+
+        return FakeAgentTarget(
+            name=cfg.name,
+            vulnerable=bool(cfg.options.get("vulnerable", True)),
+        )
     raise ValueError(
-        f"unknown target kind {cfg.kind!r} (expected openai_chat, http, callable, fake)"
+        f"unknown target kind {cfg.kind!r} "
+        "(expected openai_chat, http, callable, fake, fake_agent)"
     )

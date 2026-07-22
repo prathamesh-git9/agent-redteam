@@ -1,0 +1,16 @@
+target:
+  name: local-agent-poc
+  kind: fake_agent
+  authorized: true
+  options:
+    vulnerable: true
+
+run:
+  suite: tag:agentic
+  agentic: true
+  seed: 7
+  concurrency: 1
+  max_calls: 4
+  max_tokens: 10000
+  max_seconds: 30
+  fail_threshold: 7.0

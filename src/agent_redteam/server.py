@@ -47,7 +47,8 @@ def create_app() -> Any:
     def attacks() -> list[dict[str, Any]]:
         return [
             {"id": s.id, "category": s.category.value,
-             "tags": sorted(s.tags), "summary": s.summary}
+             "tags": sorted(s.tags), "requirements": sorted(s.requirements),
+             "summary": s.summary}
             for s in all_attacks()
         ]
 
