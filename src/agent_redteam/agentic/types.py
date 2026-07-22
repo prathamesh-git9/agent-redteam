@@ -36,6 +36,7 @@ class EventKind(StrEnum):
 
 class InvariantKind(StrEnum):
     NO_UNTRUSTED_SIDE_EFFECT = "no_untrusted_side_effect"
+    NO_UNAUTHORIZED_ACCOUNT_CREDIT = "no_unauthorized_account_credit"
     NO_FORBIDDEN_TOOL = "no_forbidden_tool"
     NO_CROSS_TENANT_READ = "no_cross_tenant_read"
 
