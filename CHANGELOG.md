@@ -8,6 +8,26 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Agent/RAG episode harness** - opt-in `EpisodeTarget` scenarios exercise
+  poisoned retrieved documents and tool execution as a resettable multi-step
+  system, not a chat transcript. Findings contain typed provenance events,
+  deterministic security-invariant evidence, and clean-twin causal attribution.
+- **Pre-execution agent guard hooks** - existing input/tool guardrails now run
+  at retrieval consumption and immediately before a tool executor. A blocked
+  call cannot produce a side effect. `CallableEpisodeTarget` and
+  `EpisodeInstrumentation` provide the production integration seam; the safe
+  `FakeAgentTarget` and `examples/agentic_rag_poc.py` provide an offline proof.
+- **Actionable findings** - successful attacks receive evidence-linked,
+  machine-readable guardrail configuration recommendations; related probes are
+  deduplicated into deterministic root-cause groups in JSON reports.
+- **Agentic CLI/config support** - `run.agentic`, `run.seed`, `--agentic`, the
+  `tag:agentic` scenario suite, and `fake_agent` target. Agentic execution stays
+  behind the existing authorization gate, shared call/token/time budget, and
+  dry-run side-effect default.
+- **Atomic budget reservations** close the concurrent check/send race. The
+  refusal-gated oracle also avoids semantic judges when deterministic evidence
+  decides and treats canary/tool facts as stronger than refusal wording.
+
 - **Bounded adaptive attack engine** — attacks can now run as a closed
   refinement loop: an attacker LLM reads the target's real response and mutates
   the next payload toward the oracle's success criterion (PAIR / Crescendo

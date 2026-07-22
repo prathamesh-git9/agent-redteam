@@ -9,7 +9,9 @@ human* whether each attack succeeded, attaches the evidence, and rolls the
 results into a CVSS-style risk score and a pass/fail verdict you can gate CI on.
 The same package ships composable **guardrail middleware** you can put in front
 of your own agent, so you can measure the defended target against the undefended
-one and see whether a mitigation actually helped.
+one and see whether a mitigation actually helped. For RAG/tool agents it runs
+resettable episodes, records retrieval-to-tool provenance, and uses clean-twin
+replay to distinguish a causal poisoned-document failure from mere correlation.
 
 > **Scope of use.** This is a defensive tool for testing systems you own or have
 > written permission to assess. A run is refused unless the target config
@@ -111,6 +113,52 @@ agent-redteam scan --config target.yaml --guardrails default --compare
 | `http` | an arbitrary JSON HTTP agent | request/response mapped by template |
 | `callable` | a local Python function | in-process agents, unit tests |
 | `fake` | a scripted rule table | deterministic; used throughout the tests |
+| `fake_agent` | a resettable RAG/tool agent | offline agentic POC and CI fixture |
+
+## Agent and RAG testing
+
+Chat-only probes cannot tell whether a poisoned document actually caused a tool
+to execute. Agentic scenarios are therefore opt-in and require an episode-aware
+target:
+
+```yaml
+target:
+  name: local-agent-poc
+  kind: fake_agent
+  authorized: true
+run:
+  suite: tag:agentic
+  agentic: true
+  seed: 7
+  max_calls: 4
+```
+
+```bash
+agent-redteam scan --config examples/agentic-target.yaml --agentic --json report.json
+python examples/agentic_rag_poc.py
+```
+
+Each agentic finding includes a typed event graph, the untrusted retrieval event,
+the path from that event to the side effect, a clean-fixture counterfactual, a
+root-cause group, and machine-readable guardrail configuration recommendations.
+The shipped POC proves an undefended poisoned retrieval reaches a simulated
+`send_email`, while `ToolCallPolicy` prevents its executor from running.
+Copy a report recommendation's `config_patch` into YAML and apply it directly:
+
+```bash
+agent-redteam scan --config examples/agentic-target.yaml --agentic \
+  --guardrail-config examples/agentic-guardrails.yaml --compare
+```
+
+For a real in-process agent, wrap an async handler with
+`CallableEpisodeTarget`. Feed retrieved artifacts through
+`EpisodeInstrumentation.retrieval_result` and invoke tools only through
+`EpisodeInstrumentation.execute_tool`; this is the enforcement point that runs
+the existing `GuardPipeline` before the application's executor. The handler must
+consume the returned `ArtifactUse.artifact`, which contains any policy rewrite,
+and ignore blocked artifacts. Live side
+effects are disabled by default, and the same authorization and shared budget
+gate applies to episode and clean-twin calls.
 
 ## Attack library
 
@@ -162,7 +210,7 @@ Composable middleware that wraps any target into a *defended* one:
 ```python
 from agent_redteam.guardrails import GuardPipeline, default_guardrails
 
-defended = GuardPipeline(default_guardrails()).wrap(my_target)
+defended = default_guardrails().wrap(my_target)
 ```
 
 ## Scoring
