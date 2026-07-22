@@ -8,6 +8,15 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Bounded adaptive attack engine** — attacks can now run as a closed
+  refinement loop: an attacker LLM reads the target's real response and mutates
+  the next payload toward the oracle's success criterion (PAIR / Crescendo
+  strategies), instead of firing a fixed payload once. Opt-in via
+  `scan --adaptive --attacker-model <id>`; still gated by the same authorization
+  check and metered by a shared budget ledger so it can never runaway-spend.
+  Adaptive findings carry a full step-by-step `trace` in the report, so they are
+  as auditable as static ones. Verified live: it found a jailbreak bypass on a
+  real model that the static suite did not.
 - `OpenAIJudge` — a production LLM-as-judge for semantic success oracles, wired
   into the CLI via `scan --judge-model` (with `--judge-base-url` /
   `--judge-key-env`). Temperature-0, strict-JSON rubric, and fail-safe: any
