@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `OpenAIJudge` — a production LLM-as-judge for semantic success oracles, wired
+  into the CLI via `scan --judge-model` (with `--judge-base-url` /
+  `--judge-key-env`). Temperature-0, strict-JSON rubric, and fail-safe: any
+  transport or parse error scores the attack as not successful.
+- Offline unit tests for the target adapters, the CLI, and the judge, raising
+  coverage to 90%.
+- A PEP 561 `py.typed` marker so downstream users get the shipped type hints.
+
 ## [0.1.0]
 
 Initial release.

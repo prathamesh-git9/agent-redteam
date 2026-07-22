@@ -156,6 +156,21 @@ Each factor is orthogonal and printed in a recomputable vector, e.g.
 meets `fail_threshold` or if successes regress against a saved baseline
 (`agent-redteam baseline save|compare`).
 
+### Semantic judging (optional)
+
+Most attacks are scored by deterministic oracles (a planted canary either leaked
+or it didn't). For the few whose success is genuinely semantic, add an
+LLM-as-judge — pinned to temperature 0 and a strict JSON rubric for
+repeatability:
+
+```bash
+agent-redteam scan --config target.yaml --judge-model gpt-4o-mini
+# --judge-base-url / --judge-key-env point it at any OpenAI-compatible endpoint
+```
+
+The judge is **fail-safe**: any transport or parse error scores the attack as
+*not* successful, so a flaky judge can never manufacture a finding.
+
 ## Interfaces
 
 - **CLI** — `scan`, `list-attacks`, `list-guardrails`, `report`, `baseline`
