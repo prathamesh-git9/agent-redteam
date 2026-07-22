@@ -13,9 +13,10 @@ import json
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from agent_redteam.scoring.model import band
-from agent_redteam.types import AttackResult
+from agent_redteam.types import AttackResult, Role
 
 
 @dataclass
@@ -64,25 +65,7 @@ class Report:
                 "max_score": self.max_score,
             },
             "notes": self.notes,
-            "results": [
-                {
-                    "attack_id": r.probe.attack_id,
-                    "category": r.probe.category.value,
-                    "label": r.probe.label,
-                    "references": list(r.probe.references),
-                    "success": r.succeeded,
-                    "confidence": r.verdict.confidence,
-                    "score": r.score.value,
-                    "band": band(r.score.value),
-                    "vector": r.score.vector,
-                    "evidence": [
-                        {"kind": e.kind, "detail": e.detail, "span": e.span}
-                        for e in r.verdict.evidence
-                    ],
-                    "error": r.response.error,
-                }
-                for r in self.results
-            ],
+            "results": [_result_to_dict(r) for r in self.results],
         }
 
     def to_json(self, *, indent: int = 2) -> str:
@@ -115,6 +98,12 @@ class Report:
                 f"| {r.score.value} | {band(r.score.value)} | {r.probe.category.value} "
                 f"| `{r.probe.attack_id}` | {verdict} | {ev} |"
             )
+        for r in ordered:
+            if r.trace:
+                lines.append(
+                    f"adaptive: {r.stop_reason} after {len(r.trace)} target calls "
+                    f"for `{r.probe.attack_id}`"
+                )
         return "\n".join(lines) + "\n"
 
     def to_junit(self) -> str:
@@ -137,3 +126,52 @@ class Report:
                 )
                 failure.text = "\n".join(e.detail for e in r.verdict.evidence)
         return ET.tostring(suite, encoding="unicode")
+
+
+def _result_to_dict(result: AttackResult) -> dict[str, Any]:
+    adaptive = bool(result.trace)
+    out: dict[str, Any] = {
+        "attack_id": result.probe.attack_id,
+        "category": result.probe.category.value,
+        "label": result.probe.label,
+        "references": list(result.probe.references),
+        "success": result.succeeded,
+        "confidence": result.verdict.confidence,
+        "score": result.score.value,
+        "band": band(result.score.value),
+        "vector": result.score.vector,
+        "evidence": [
+            {"kind": e.kind, "detail": e.detail, "span": e.span}
+            for e in result.verdict.evidence
+        ],
+        "error": result.response.error,
+        "adaptive": adaptive,
+        "stop_reason": result.stop_reason,
+    }
+    if adaptive:
+        out["trace"] = [_observation_to_dict(obs) for obs in result.trace]
+    return out
+
+
+def _observation_to_dict(obs: Any) -> dict[str, Any]:
+    return {
+        "step_id": obs.step_id,
+        "parent_id": obs.parent_id,
+        "depth": obs.depth,
+        "prompt": _last_user_text(obs.probe.conversation),
+        "response": obs.response.text,
+        "success": obs.verdict.success,
+        "confidence": obs.verdict.confidence,
+        "score": obs.score.value,
+        "evidence": [
+            {"kind": e.kind, "detail": e.detail, "span": e.span}
+            for e in obs.verdict.evidence
+        ],
+    }
+
+
+def _last_user_text(conversation: Any) -> str:
+    for message in reversed(conversation):
+        if message.role == Role.USER:
+            return message.content
+    return ""

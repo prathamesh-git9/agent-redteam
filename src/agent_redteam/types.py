@@ -240,12 +240,22 @@ class RiskScore:
 
 @dataclass(frozen=True)
 class AttackResult:
-    """The full, replayable record of one probe run end to end."""
+    """The full, replayable record of one probe run end to end.
+
+    For a static probe ``trace`` is empty and ``stop_reason`` is None. For an
+    adaptive attack, ``probe``/``response``/``verdict``/``score`` hold the *best*
+    observation and ``trace`` holds every target call the refinement loop made,
+    so an adaptive finding is as auditable as a static one. ``trace`` is typed
+    loosely (a tuple of ``adaptive.types.AttackObservation``) to keep this base
+    module free of any dependency on the adaptive package.
+    """
 
     probe: Probe
     response: Response
     verdict: OracleVerdict
     score: RiskScore
+    trace: tuple[Any, ...] = ()
+    stop_reason: str | None = None
 
     @property
     def succeeded(self) -> bool:

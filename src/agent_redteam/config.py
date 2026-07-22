@@ -49,6 +49,9 @@ class RunConfig:
     fail_threshold: float = 7.0
     judge_model: str | None = None
     baseline_path: str | None = None
+    # When true (and an attacker is wired), attacks that support it run as
+    # bounded adaptive refinement loops instead of one-shot static probes.
+    adaptive: bool = False
 
 
 def _host_of(target: str) -> str:
@@ -139,4 +142,5 @@ def parse_run_config(data: dict[str, Any]) -> RunConfig:
         fail_threshold=float(run.get("fail_threshold", 7.0)),
         judge_model=run.get("judge_model"),
         baseline_path=run.get("baseline_path"),
+        adaptive=bool(run.get("adaptive", False)),
     )
