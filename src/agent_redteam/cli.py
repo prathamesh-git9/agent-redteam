@@ -16,6 +16,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from agent_redteam.adaptive import AdaptiveLimits, OpenAIAttacker
 from agent_redteam.config import AuthorizationError, RunConfig, load_run_config
 from agent_redteam.oracles import OpenAIJudge, default_oracle
 from agent_redteam.registry import all_attacks, all_guardrails, select_suite
@@ -121,6 +122,26 @@ def scan(
         "--judge-key-env",
         help="Environment variable containing the judge API key.",
     ),
+    adaptive: bool = typer.Option(
+        False,
+        "--adaptive",
+        help="Run adaptive-capable attacks with a bounded attacker model loop.",
+    ),
+    attacker_model: str | None = typer.Option(
+        None,
+        "--attacker-model",
+        help="OpenAI-compatible model id for adaptive mutation generation.",
+    ),
+    attacker_base_url: str = typer.Option(
+        "https://api.openai.com/v1",
+        "--attacker-base-url",
+        help="Base URL for the attacker chat-completions endpoint.",
+    ),
+    attacker_key_env: str = typer.Option(
+        "OPENAI_API_KEY",
+        "--attacker-key-env",
+        help="Environment variable containing the attacker API key.",
+    ),
 ) -> None:
     """Run an attack suite against the configured target."""
     cfg: RunConfig = load_run_config(config)
@@ -130,6 +151,17 @@ def scan(
         cfg.fail_threshold = fail_threshold
     if judge_model is not None:
         cfg.judge_model = judge_model
+    attacker = None
+    if adaptive:
+        if attacker_model is None:
+            console.print("[red]error:[/red] --adaptive requires --attacker-model")
+            raise typer.Exit(code=2)
+        cfg.adaptive = True
+        attacker = OpenAIAttacker(
+            model=attacker_model,
+            base_url=attacker_base_url,
+            api_key_env=attacker_key_env,
+        )
 
     _register_attacks()
     target = build_target(cfg.target)
@@ -141,12 +173,22 @@ def scan(
             api_key_env=judge_key_env,
         )
     oracle = default_oracle(judge=judge)
-    runner = Runner(oracle, cfg)
+    runner = Runner(oracle, cfg, attacker=attacker)
 
     console.print(
         f"[dim]authorized: {cfg.target.authorized}  "
         f"allowlist: {cfg.target.allowlist or ['(loopback only)']}[/dim]"
     )
+    if adaptive and attacker_model is not None:
+        limits = AdaptiveLimits()
+        console.print(
+            "[yellow]responsible use:[/yellow] adaptive testing is bounded to "
+            "authorized synthetic-canary objectives only; "
+            f"attacker_model={attacker_model} caps="
+            f"target_calls={limits.max_target_calls}, "
+            f"attacker_calls={limits.max_attacker_calls}, "
+            f"tokens={limits.max_total_tokens}, seconds={limits.max_seconds}"
+        )
 
     try:
         base_report = asyncio.run(runner.run(target))
