@@ -160,3 +160,15 @@ def test_baseline_save_then_compare_same_run_has_no_regressions(tmp_path: Path) 
     assert baseline_path.exists()
     assert compare.exit_code == 0
     assert "no regressions" in compare.stdout
+
+
+def test_report_command_renders_saved_json(tmp_path: Path) -> None:
+    # A scan --json artifact should re-render via `report` without a target.
+    config = _write_config(tmp_path)
+    out = tmp_path / "report.json"
+    scan = runner.invoke(app, ["scan", "--config", str(config), "--json", str(out)])
+    assert scan.exit_code == 0
+    result = runner.invoke(app, ["report", str(out)])
+    assert result.exit_code == 0
+    assert "fake-agent" in result.stdout
+    assert "attacks:" in result.stdout

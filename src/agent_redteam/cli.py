@@ -267,6 +267,54 @@ def baseline(
     raise typer.Exit(code=1)
 
 
+@app.command("report")
+def show_report(
+    path: Path = typer.Argument(
+        ..., help="A JSON report previously written by scan --json."
+    ),
+) -> None:
+    """Re-render a saved JSON report as a table.
+
+    Lets a CI job or a reviewer inspect a stored scan artifact without re-running
+    the suite. Renders straight from the JSON so it never needs the target or an
+    API key.
+    """
+    import json
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    verdict = "[red]FAIL[/red]" if data.get("failed") else "[green]PASS[/green]"
+    console.print(
+        f"[bold]{data.get('target', '?')}[/bold]  suite: {data.get('suite', '?')}  "
+        f"verdict: {verdict}"
+    )
+    table = Table()
+    columns = ("Score", "Band", "Category", "Attack", "Verdict", "Evidence")
+    for col in columns:
+        table.add_column(
+            col,
+            justify="right" if col == "Score" else "left",
+            overflow="fold" if col == "Evidence" else None,
+        )
+    results = sorted(
+        data.get("results", []), key=lambda r: r.get("score", 0), reverse=True
+    )
+    for r in results:
+        ev = "; ".join(e.get("detail", "") for e in r.get("evidence", [])[:2]) or "—"
+        succeeded = r.get("success")
+        verdict_cell = "[red]SUCCESS[/red]" if succeeded else "[green]blocked[/green]"
+        table.add_row(
+            str(r.get("score", 0)), r.get("band", "?"), r.get("category", "?"),
+            r.get("attack_id", "?"), verdict_cell, ev,
+        )
+    console.print(table)
+    summary = data.get("summary", {})
+    console.print(
+        f"attacks: {summary.get('total', 0)}  "
+        f"succeeded: [red]{summary.get('successes', 0)}[/red]  "
+        f"max score: {summary.get('max_score', 0)}"
+    )
+
+
 @app.command()
 def version() -> None:
     from agent_redteam import __version__
