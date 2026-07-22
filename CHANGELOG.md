@@ -8,6 +8,15 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **No-API mode via the Codex CLI** (`live_support_ticket_poc.py --codex`) — the
+  full episode harness (engine, invariant oracle, clean-twin causal attribution,
+  runtime guard) runs with the decision model driven through `codex exec` on a
+  ChatGPT subscription, so the red-team needs no OpenAI API key. Verified live on
+  **gpt-5.4**: the real harness ran end to end; a fully-naive gpt-5.4 agent was
+  compromised with causal attribution (poisoned ticket → credit) and the guard
+  blocked execution, while a gpt-5.4 agent given even a mild trusted policy
+  resisted the injection where gpt-4o did not — i.e. the tool measuring genuine
+  cross-model robustness.
 - **Adaptive injection discovery for agents** — `EpisodeArtifactAdaptiveEngine`
   searches over the *poisoned business artifact* (not a chat string): an attacker
   model rewrites the injected note, the episode is re-run, and on the first
