@@ -141,6 +141,9 @@ python examples/agentic_rag_poc.py
 Each agentic finding includes a typed event graph, the untrusted retrieval event,
 the path from that event to the side effect, a clean-fixture counterfactual, a
 root-cause group, and machine-readable guardrail configuration recommendations.
+JSON reports also include a `causal_proof` bundle: every event is hash-chained and
+the poisoned trace, clean twin, and attribution claim share one SHA-256 content
+address. `verify_causal_proof` detects post-run edits without rerunning a model.
 The shipped POC proves an undefended poisoned retrieval reaches a simulated
 `send_email`, while `ToolCallPolicy` prevents its executor from running.
 Copy a report recommendation's `config_patch` into YAML and apply it directly:

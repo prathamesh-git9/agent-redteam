@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from dataclasses import replace
 
 import pytest
@@ -19,6 +20,7 @@ from agent_redteam.agentic import (
     InvariantOracle,
     SecurityInvariant,
     TraceEvent,
+    verify_causal_proof,
 )
 from agent_redteam.agentic.trace import TraceRecorder
 from agent_redteam.agentic.types import AgentOutcome
@@ -81,8 +83,7 @@ async def test_tool_policy_blocks_before_side_effect_executor() -> None:
     assert target.side_effects == []
     trace = report.results[0].episode_trace
     assert any(
-        event.kind == EventKind.GUARD_DECISION
-        and event.data["action"] == "block"
+        event.kind == EventKind.GUARD_DECISION and event.data["action"] == "block"
         for event in trace.events
     )
     assert not any(event.kind == EventKind.SIDE_EFFECT for event in trace.events)
@@ -99,8 +100,7 @@ async def test_default_pipeline_scans_normalized_retrieval_before_tool_use() -> 
     assert target.side_effects == []
     decisions = report.results[0].episode_trace.guard_decisions
     assert any(
-        decision.guardrail == "injection_detector"
-        and decision.action.value == "block"
+        decision.guardrail == "injection_detector" and decision.action.value == "block"
         for decision in decisions
     )
 
@@ -116,6 +116,13 @@ async def test_report_serializes_trace_attribution_groups_and_remediation() -> N
     assert result["episode_trace"]["events"]
     assert result["counterfactual_trace"]["events"]
     assert result["attribution"]["status"] == "causal"
+    proof = result["causal_proof"]
+    assert verify_causal_proof(proof) == (True, "ok")
+    tampered = copy.deepcopy(proof)
+    tampered["attack_trace"]["events"][0]["actor"] = "rewritten-after-run"
+    valid, reason = verify_causal_proof(tampered)
+    assert valid is False
+    assert "hash mismatch" in reason
     assert result["recommendations"][0]["config_patch"]
     assert data["finding_groups"][0]["root_cause"] == (
         "untrusted_retrieval_reached_side_effect"
@@ -137,9 +144,9 @@ async def test_report_recommendation_is_directly_executable_as_guard_config() ->
     pipeline = pipeline_from_mapping(recommendation.config_patch)
     fixed_target = FakeAgentTarget("recommendation-fixed")
 
-    fixed_report = await Runner(
-        default_oracle(), config(fixed_target.name)
-    ).run(pipeline.wrap(fixed_target))
+    fixed_report = await Runner(default_oracle(), config(fixed_target.name)).run(
+        pipeline.wrap(fixed_target)
+    )
 
     assert not fixed_report.results[0].succeeded
     assert fixed_target.side_effects == []
@@ -306,9 +313,9 @@ async def test_callable_agent_adapter_instruments_and_blocks_real_executor() -> 
         return Response("done")
 
     target = CallableEpisodeTarget(agent, "callable-agent", cleanup)
-    guarded = GuardPipeline(
-        tool_guards=[ToolCallPolicy(deny=("send_email",))]
-    ).wrap(target)
+    guarded = GuardPipeline(tool_guards=[ToolCallPolicy(deny=("send_email",))]).wrap(
+        target
+    )
 
     report = await Runner(default_oracle(), config(target.name)).run(guarded)
 

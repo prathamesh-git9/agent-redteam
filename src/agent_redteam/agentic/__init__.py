@@ -14,6 +14,7 @@ from agent_redteam.agentic.hooks import (
     PipelineRuntimeHooks,
 )
 from agent_redteam.agentic.oracle import InvariantOracle
+from agent_redteam.agentic.proof import build_causal_proof, verify_causal_proof
 from agent_redteam.agentic.protocols import (
     AgentRuntimeHooks,
     EpisodeSession,
@@ -61,6 +62,8 @@ __all__ = [
     "FakeAgentTarget",
     "InvariantKind",
     "InvariantOracle",
+    "build_causal_proof",
+    "verify_causal_proof",
     "InvariantViolation",
     "PipelineRuntimeHooks",
     "ScenarioPlan",

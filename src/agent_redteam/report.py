@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from agent_redteam.agentic.proof import build_causal_proof
 from agent_redteam.findings import cluster_findings
 from agent_redteam.scoring.model import band
 from agent_redteam.types import AttackResult, Role
@@ -126,8 +127,10 @@ class Report:
         # Most dangerous first — a reviewer reads top-down and should hit the
         # critical items before losing patience.
         ordered = sorted(self.results, key=lambda r: r.score.value, reverse=True)
-        lines += ["| Score | Band | Category | Attack | Verdict | Evidence |",
-                  "|------:|------|----------|--------|---------|----------|"]
+        lines += [
+            "| Score | Band | Category | Attack | Verdict | Evidence |",
+            "|------:|------|----------|--------|---------|----------|",
+        ]
         for r in ordered:
             verdict = (
                 "ERROR" if r in self.errors else ("SUCCESS" if r.succeeded else "blocked")
@@ -155,9 +158,7 @@ class Report:
                     f"{len(r.episode_trace.events)} events; attribution={status}"
                 )
         recommendations = {
-            item.id: item
-            for result in ordered
-            for item in result.recommendations
+            item.id: item for result in ordered for item in result.recommendations
         }
         if recommendations:
             lines += ["", "## Recommended remediation", ""]
@@ -186,8 +187,10 @@ class Report:
         )
         for r in self.results:
             case = ET.SubElement(
-                suite, "testcase",
-                classname=r.probe.category.value, name=r.probe.attack_id,
+                suite,
+                "testcase",
+                classname=r.probe.category.value,
+                name=r.probe.attack_id,
             )
             if r in self.errors:
                 error = ET.SubElement(
@@ -198,7 +201,8 @@ class Report:
                 error.text = "\n".join(e.detail for e in r.verdict.evidence)
             elif r.succeeded:
                 failure = ET.SubElement(
-                    case, "failure",
+                    case,
+                    "failure",
                     message=f"attack succeeded (score {r.score.value}, {r.score.vector})",
                 )
                 failure.text = "\n".join(e.detail for e in r.verdict.evidence)
@@ -273,6 +277,12 @@ def _result_to_dict(result: AttackResult) -> dict[str, Any]:
             "counterfactual_changed": attribution.counterfactual_changed,
             "explanation": attribution.explanation,
         }
+        out["causal_proof"] = build_causal_proof(
+            result.scenario_id or result.episode_trace.scenario_id,
+            result.episode_trace,
+            result.counterfactual_trace,
+            result.attribution,
+        )
     return out
 
 

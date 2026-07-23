@@ -21,6 +21,7 @@ from agent_redteam.agentic import (
     EventKind,
     InvariantOracle,
 )
+from agent_redteam.agentic.proof import verify_causal_proof
 from agent_redteam.budget import BudgetLedger
 from agent_redteam.types import GuardAction
 
@@ -85,6 +86,7 @@ async def test_demo_json_exposes_proof_and_guard_decision() -> None:
     assert proof["counterfactual_changed"] is True
     assert proof["guardrail_prevented_execution"] is True
     assert proof["guard_decision"]["decision"] == "BLOCK"
+    assert verify_causal_proof(proof["causal_proof"]) == (True, "ok")
     assert proof["guard_decision"]["executor_called"] is False
 
 
